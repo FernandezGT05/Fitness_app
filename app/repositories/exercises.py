@@ -11,7 +11,7 @@ def edit_exercise(exercise_id):
         cur=conn.cursor()
 
         exercises=['exercise_name','description','muscle_group']
-        cur.execute("SELECT exercise_name,description,muscle_group FROM exercises WHERE exercoise_id=?",(exercise_id,))
+        cur.execute("SELECT exercise_name,description,muscle_group FROM exercises WHERE exercise_id=?",(exercise_id,))
 
         for x,exercises in enumerate(exercises,start=1):
             print(f"{x}.{exercises[x-1]}")

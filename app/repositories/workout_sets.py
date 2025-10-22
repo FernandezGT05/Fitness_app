@@ -102,3 +102,124 @@ def edit_set_info(user_id,field_to_edit):
                 except ValueError:
                     print("Enter a neumeric value.")
                     continue
+
+def add_set_to_exercise(user_id):
+    from .workout_session import _print_session_details
+    with get_connection() as conn:
+        cur=conn.cursor()
+        cur.execute("SELECT session_id,date,notes,split_name FROM workout_session WHERE user_id=?",(user_id,))
+        session=cur.fetchall()
+        session_ids=[]
+        for rows in  session:
+            session_id,date,notes,split_name=rows
+            print(f"|session {session_id}| --- |{split_name} day| --- |{date}|")
+            session_ids.append(session_id)
+            if notes:
+                print(f"Notes: {notes}")
+        
+        while True:
+            try:
+                session_to_add=input("Enter the session ID to add a set: ")
+                session_to_add=int(session_to_add)
+                if session_to_add in session_ids:
+                    break
+                else:
+                    print("Invalid session ID")
+            except ValueError:
+                print("Enter a valid numeric value.")
+        _print_session_details(cur,session_to_add)
+
+        while True:
+            exercise_to_add=input("enter the exercise number to add a set: ").strip()
+            try:
+                exercise_to_add=int(exercise_to_add)
+                break
+            except ValueError:
+                print("Enter a valid numeric value.")
+        cur.execute("SELECT we_id FROM workout_exercises WHERE order_in_session=? AND session_id=?",(exercise_to_add,session_to_add))
+        exercise_row=cur.fetchone()
+        if not exercise_row:
+            print("No exercise found with that order number in this session.")
+            return
+        
+        we_id=exercise_row[0]
+        cur.execute("SELECT set_number FROM workout_sets WHERE we_id=?",(we_id,))
+        sets=cur.fetchall()
+        all_sets=[]
+        for row in sets:
+            set_num=row
+            all_sets.append(set_num)
+
+        set_number=len(all_sets)+1
+        print("\n", end="")
+        print(f"Set No.{set_number}")
+        reps=input("Number of reps: ")
+        weight=input("Weight used in kg (press enter to skip): ")
+        add_workout_set(cur,we_id,set_number,reps,weight)
+                    
+def del_set(user_id):
+    from .workout_session import _print_session_details
+    with get_connection() as conn:
+        cur=conn.cursor()
+        cur.execute("SELECT session_id,date,notes,split_name FROM workout_session WHERE user_id=?",(user_id,))
+        session=cur.fetchall()
+        session_ids=[]
+        for rows in  session:
+            session_id,date,notes,split_name=rows
+            print(f"|session {session_id}| --- |{split_name} day| --- |{date}|")
+            session_ids.append(session_id)
+            if notes:
+                print(f"Notes: {notes}")
+        
+        while True:
+            try:
+                session_to_edit=input("Enter the session ID to delete a set: ")
+                session_to_edit=int(session_to_edit)
+                if session_to_edit in session_ids:
+                    break
+                else:
+                    print("Invalid session ID")
+            except ValueError:
+                print("Enter a valid numeric value.")
+        
+        _print_session_details(cur,session_to_edit)
+
+        while True:
+            try:
+                select_order=input("Enter the order number of the set to delete: ")
+                select_order=int(select_order)
+                
+                cur.execute("SELECT order_in_session,we_id FROM workout_exercises WHERE session_id=?",(session_to_edit,))
+                orders={order_num:we_id for order_num,we_id in cur.fetchall()}
+                
+                if select_order not in orders:
+                    print("Invalid order number.Try again.")
+                    continue
+                break
+            except ValueError:
+                    print("Enter a valid numeric value.")
+
+        cur.execute("SELECT we_id FROM workout_exercises WHERE order_in_session=? AND session_id=?",(select_order,session_to_edit))
+        we_id=cur.fetchone()[0]
+        cur.execute("SELECT set_number FROM workout_sets WHERE we_id=?",(we_id,))
+        sets=[row[0] for row in cur.fetchall()]
+
+        while True:
+            set_to_del=input("Enter the set number to delete: ").strip()
+            try:
+                set_to_del=int(set_to_del)
+                if set_to_del in sets:
+                    break
+                else:
+                    print("Enter a valid set number.")
+            except ValueError:
+                print("Enter a valid numeric value.")
+        
+        cur.execute("DELETE FROM workout_sets WHERE set_number=? AND we_id=?",(set_to_del,we_id))
+        print("Set successfully deleted.")
+        # Re order set numbers after deletion
+        cur.execute("SELECT set_number FROM workout_sets WHERE we_id=? ORDER BY set_number", (we_id,))
+        remaining = [r[0] for r in cur.fetchall()]
+        for i, old_num in enumerate(remaining, start=1):
+            cur.execute("UPDATE workout_sets SET set_number=? WHERE we_id=? AND set_number=?", (i, we_id, old_num))
+

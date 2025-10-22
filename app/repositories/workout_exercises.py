@@ -103,4 +103,107 @@ def edit_workout_exercise(user_id,field_to_edit):
                 except ValueError:
                     print("Enter a valid numeric value.")
             
-            
+def add_exercise_to_session(user_id):
+    from .workout_sets import add_workout_set
+    with get_connection() as conn:
+        cur=conn.cursor()
+        cur.execute("SELECT session_id,date,notes,split_name FROM workout_session WHERE user_id=?",(user_id,))
+        session=cur.fetchall()
+        session_ids=[]
+        for rows in  session:
+            session_id,date,notes,split_name=rows
+            print(f"|session {session_id}| --- |{split_name} day| --- |{date}|")
+            session_ids.append(session_id)
+            if notes:
+                print(f"Notes: {notes}")
+        
+        while True:
+            try:
+                session_to_add=input("Enter the session ID to add an exercise: ")
+                session_to_add=int(session_to_add)
+                if session_to_add in session_ids:
+                    break
+                else:
+                    print("Invalid session ID")
+            except ValueError:
+                print("Enter a valid numeric value.")
+
+        cur.execute("SELECT exercise_id,exercise_name,muscle_group FROM exercises")
+        exercise=cur.fetchall()
+        exercises=[]
+        for row in exercise:
+            exercise_id,exercise_name,muscle_group=row
+            print(f"{exercise_id}. {exercise_name} ---- {muscle_group}")
+            exercises.append(exercise_id)
+        
+        while True:
+            try:
+                selected_exercise=input("Enter an exercise to add: ").strip()
+                order=int(input("Enter the order in session: ").strip())
+                selected_exercise=int(selected_exercise)
+                if selected_exercise in exercises:
+                    break
+                else:
+                    print("Invalid exercise.")
+            except ValueError:
+                print("Enter a valid numeric value.")
+        
+        we_id=add_workout_exercise(cur,selected_exercise,session_to_add,order)
+        while True:
+                try:
+                    set_amount = int(input("Number of sets: "))
+                    break
+                except ValueError:
+                    print("Please enter a number for sets.")
+        for set_number in range(1,set_amount+1):
+            print("\n", end="")
+            print(f"Set No.{set_number}")
+            reps=input("Number of reps: ")
+            weight=input("Weight used in kg (press enter to skip): ")
+            add_workout_set(cur,we_id,set_number,reps,weight)
+
+        print("\n", end="")    
+        print("Exercise logged successfully!")
+
+def delete_exercise(user_id):
+    from .workout_session import _print_session_details
+    with get_connection() as conn:
+        cur=conn.cursor()
+        cur.execute("SELECT session_id,date,notes,split_name FROM workout_session WHERE user_id=?",(user_id,))
+        session=cur.fetchall()
+        session_ids=[]
+        for rows in  session:
+            session_id,date,notes,split_name=rows
+            print(f"|session {session_id}| --- |{split_name} day| --- |{date}|")
+            session_ids.append(session_id)
+            if notes:
+                print(f"Notes: {notes}")
+        
+        while True:
+            try:
+                session_to_edit=input("Enter the session ID to delete an exercise: ")
+                session_to_edit=int(session_to_edit)
+                if session_to_edit in session_ids:
+                    break
+                else:
+                    print("Invalid session ID")
+            except ValueError:
+                print("Enter a valid numeric value.")
+        
+        _print_session_details(cur,session_to_edit)
+
+        cur.execute("SELECT order_in_session FROM workout_exercises WHERE session_id=?",(session_to_edit,))
+        order=[row[0] for row in cur.fetchall()]
+        while True:
+            exercise_to_del=input("Enter the exercise order number to delete an exercise: ").strip()
+            try:
+                exercise_to_del=int(exercise_to_del)
+                if exercise_to_del in order:
+                    break
+                else:
+                    print("Enter a valid exercise order number.")
+            except ValueError:
+                print("Enter a valid numeric value.")
+        
+        cur.execute("DELETE FROM workout_exercises WHERE order_in_session=?",(exercise_to_del,))
+        print("Exercise successfully deleted.")
